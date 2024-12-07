@@ -1,21 +1,130 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+/* Global Styles */
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #2e2e2e;
+  color: #fff;
+  font-family: 'Arial', sans-serif;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.container {
+  text-align: center;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  padding: 20px;
+}
+
+.navbar {
+  width: 50%;
+  background-color: #3488d8;
+  padding: 20px;
+  font-weight: bold;
+  margin-bottom: 40px; /* More space below the navbar */
+  border-radius: 10px; /* Rounded top corners */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+
+.logo {
+  font-size: 2rem;
+  margin: 0;
+  color: white;
+}
+
+.upload-btn {
+  display: inline-block;
+  background-color: #3488d8;
+  color: white;
+  padding: 15px 30px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  transition: transform 0.3s ease, background-color 0.2s ease;
+}
+
+.upload-btn:hover {
+  background-color: #2872a1;
+  transform: scale(1.05);
+}
+
+.upload-btn:active {
+  transform: scale(1);
+}
+
+/* Hide the default file input */
+.file-input {
+  display: none;
+}
+
+.file-name {
+  color: #fff;
+  margin-top: 10px;
+  font-size: 1.1rem;
+}
+
+.buttons-container {
+  display: flex;
+  justify-content: center;
+  gap: 20px; /* Added gap between buttons */
+  margin-top: 20px;
+}
+
+.submit-btn {
+  width: 150px;
+  background-color: #3488d8;
+  color: white;
+  padding: 15px 30px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  transition: transform 0.3s ease, background-color 0.2s ease;
+}
+
+.submit-btn:hover {
+  background-color: #2872a1;
+  transform: scale(1.05);
+}
+
+.submit-btn:active {
+  transform: scale(1);
+}
+
+/* File content section */
+.file-content {
+  margin-top: 40px;
+  padding: 20px;
+  background-color: #333;
+  border-radius: 8px;
+  color: #e0e0e0;
+  width: 100%;
+  max-width: 800px;
+  text-align: left;
+  overflow-y: auto;
+  max-height: 400px;
+}
+
+.file-content h2 {
+  font-size: 1.5rem;
+  margin-bottom: 10px;
+}
+
+pre {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 1rem;
+  color: #f0f0f0;
+  background-color: #444;
+  padding: 10px;
+  border-radius: 5px;
+  margin-top: 10px;
 }
