@@ -1,29 +1,40 @@
-// app/api/grade/route.ts
-import { IncomingForm } from 'formidable';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
+import OpenAI from "openai";
 
-export const config = {
-  api: {
-    bodyParser: false,  // Disable the body parser to allow formidable to handle file parsing
-  },
-};
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY, // Ensure this is properly configured
+});
 
-export async function POST(req: Request) {
-  const form = new IncomingForm();
+export async function POST(req: NextRequest) {
+  try {
+    const { fileContent, rubricContent } = await req.json();
 
-  return new Promise((resolve, reject) => {
-    form.parse(req as any, (err, fields, files) => {  // Use 'any' for compatibility
-      if (err) {
-        return reject(new NextResponse('Error parsing form data', { status: 500 }));
-      }
+    if (!fileContent) {
+      return NextResponse.json({ error: "File content is missing" }, { status: 400 });
+    }
 
-      // Simulate grading logic or replace with AI logic here
-      const results = [
-        { studentId: '123', name: 'John Doe', grade: 'A', feedback: 'Great!' },
-        { studentId: '124', name: 'Jane Smith', grade: 'B', feedback: 'Good work!' },
-      ];
+    // Construct prompt
+    const prompt = `
+      You are a teacher grading the following assignment. 
+      Provide a grade (1.0 upto 10.0) and feedback (write it in dutch), make sure the grade and feeback are both on its own line:
+      The following is the rubric or a good example:
+      ${rubricContent}
+      -----
+      ${fileContent}
+      -----
+      Respond with "Grade: [score], Feedback: [feedback]"
+    `;
 
-      resolve(new NextResponse(JSON.stringify(results), { status: 200 }));
+    const aiResponse = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 300,
     });
-  });
+
+    const result = aiResponse.choices[0]?.message?.content;
+    return NextResponse.json({ result });
+  } catch (error) {
+    console.error("Error in /api/grade:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
 }
