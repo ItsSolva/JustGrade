@@ -1,74 +1,114 @@
 "use client";
 
 import React, { useState } from "react";
+import { saveAs } from "file-saver"; // For exporting CSV
+import Papa from "papaparse"; // For CSV generation
+
+interface StudentResult {
+  fileName: string;
+  fullName: string;
+  studentId: string;
+  grade: string;
+  feedback: string;
+}
 
 const Home = () => {
-  const [file, setFile] = useState<File | null>(null);
-  const [fileName, setFileName] = useState<string | null>(null);
-  const [aiResult, setAiResult] = useState<{
-    grade: string;
-    feedback: string;
-  } | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [rubricFile, setRubricFile] = useState<File | null>(null);
-  const [rubricFileName, setRubricFileName] = useState<string | null>(null);
+  const [results, setResults] = useState<StudentResult[]>([]);
   const [loading, setLoading] = useState(false);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
+      const selectedFiles = Array.from(event.target.files);
+      setFiles(selectedFiles);
+    }
+  };
+
+  const handleRubricChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files) {
       const selectedFile = event.target.files[0];
-      setFile(selectedFile);
-      setFileName(selectedFile.name);
+      setRubricFile(selectedFile);
     }
   };
 
   const handleSubmit = async () => {
-    if (!file) {
-      alert("Please upload a student's file.");
-      return;
-    }
     if (!rubricFile) {
-      alert("Please upload an assignment/rubric file.");
+      alert("Please upload a rubric file.");
+      return;
+    }
+    if (files.length === 0) {
+      alert("Please upload at least one student file.");
       return;
     }
 
-    const reader = new FileReader();
-    const rubricReader = new FileReader();
+    setLoading(true);
+    const rubricContent = await readFileAsText(rubricFile);
 
-    rubricReader.onload = async () => {
-      const rubricContent = rubricReader.result as string;
-      reader.onload = async () => {
-        const fileContent = reader.result as string;
-        setLoading(true);
+    const newResults: StudentResult[] = [];
+    for (const file of files) {
+      try {
+        const fileContent = await readFileAsText(file);
+        const response = await fetch("/api/grade", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fileContent, rubricContent }),
+        });
 
-        try {
-          const response = await fetch("/api/grade", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ fileContent, rubricContent }),
+        const data = await response.json();
+        if (response.ok) {
+          const [gradeLine, feedbackLine] = data.result
+            .split("\n")
+            .filter(Boolean);
+
+          // Extract full name and student ID from filename
+          const { fullName, studentId } = parseFileName(file.name);
+
+          newResults.push({
+            fileName: file.name,
+            fullName,
+            studentId,
+            grade: gradeLine.replace("Grade:", "").trim(),
+            feedback: feedbackLine.replace("Feedback:", "").trim(),
           });
-
-          const data = await response.json();
-          if (response.ok) {
-            const [gradeLine, feedbackLine] = data.result
-              .split("\n")
-              .filter(Boolean);
-            setAiResult({
-              grade: gradeLine.replace("Grade:", "").trim(),
-              feedback: feedbackLine.replace("Feedback:", "").trim(),
-            });
-          } else {
-            alert("Error: " + data.error);
-          }
-        } catch (error) {
-          alert("Failed to process the files.");
-          console.error(error);
-        } finally {
-          setLoading(false);
+        } else {
+          alert(`Error grading ${file.name}: ${data.error}`);
         }
-      };
+      } catch (error) {
+        alert(`Failed to process ${file.name}.`);
+        console.error(error);
+      }
+    }
+
+    setResults(newResults);
+    setLoading(false);
+  };
+
+  const readFileAsText = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
       reader.readAsText(file);
-    };
-    rubricReader.readAsText(rubricFile);
+    });
+  };
+
+  const parseFileName = (fileName: string) => {
+    const parts = fileName.split("_");
+    if (parts.length >= 4) {
+      const fullName = `${parts[1]} ${parts[2]}`; // Voornaam + Achternaam
+      const studentId = parts[3].split(".")[0]; // Leerlingnummer (remove file extension)
+      return { fullName, studentId };
+    }
+    return { fullName: "Unknown", studentId: "Unknown" };
+  };
+
+  const handleExportCSV = () => {
+    const csv = Papa.unparse(results, {
+      fields: ["fileName", "fullName", "studentId", "grade", "feedback"],
+    });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    saveAs(blob, "grading_results.csv");
   };
 
   return (
@@ -89,46 +129,64 @@ const Home = () => {
         <input
           type="file"
           id="rubric-input"
-          onChange={(e) => {
-            if (e.target.files) {
-              const selectedFile = e.target.files[0];
-              setRubricFile(selectedFile);
-              setRubricFileName(selectedFile.name);
-            }
-          }}
+          onChange={handleRubricChange}
           className="file-input"
         />
 
-        {/* File upload */}
+        {/* Upload Student Files */}
         <label
           htmlFor="file-input"
-          className={`upload-btn ${file ? "file-selected" : ""}`}
+          className={`upload-btn ${files.length > 0 ? "file-selected" : ""}`}
         >
-          {file ? "File Selected" : "Select File"}
+          {files.length > 0
+            ? `${files.length} Files Selected`
+            : "Select Student Files"}
         </label>
         <input
           type="file"
           id="file-input"
           onChange={handleFileChange}
+          multiple
           className="file-input"
         />
 
         {/* Buttons */}
-        <button onClick={handleSubmit} className="submit-btn">
-          {loading ? "Processing..." : "Submit"}
+        <button onClick={handleSubmit} className="submit-btn" disabled={loading}>
+          {loading ? "Grading..." : "Grade Assignments"}
         </button>
+        {results.length > 0 && (
+          <button onClick={handleExportCSV} className="export-btn">
+            Export as CSV
+          </button>
+        )}
       </div>
 
-      {/* AI Result */}
-      {aiResult && (
-        <div className="ai-result">
+      {/* Results Table */}
+      {results.length > 0 && (
+        <div className="results-table">
           <h2>Grading Results</h2>
-          <p>
-            <strong>Grade:</strong> {aiResult.grade}
-          </p>
-          <p>
-            <strong>Feedback:</strong> {aiResult.feedback}
-          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>File Name</th>
+                <th>Full Name</th>
+                <th>Student ID</th>
+                <th>Grade</th>
+                <th>Feedback</th>
+              </tr>
+            </thead>
+            <tbody>
+              {results.map((result, index) => (
+                <tr key={index}>
+                  <td>{result.fileName}</td>
+                  <td>{result.fullName}</td>
+                  <td>{result.studentId}</td>
+                  <td>{result.grade}</td>
+                  <td>{result.feedback}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
